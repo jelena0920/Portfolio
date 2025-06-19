@@ -1,0 +1,290 @@
+---
+title: "project"
+output: html_document
+date: "2024-03-29"
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+```
+
+```{r}
+datapr<-read.csv("Wholesale.csv", header = TRUE, sep = ",")#import data
+datapca <- datapr
+datapca$Channel <- NULL  # Remove the 'Channel' column/ 
+datapca$Region <- NULL 
+names(datapca)
+
+```
+
+```{r}
+ts.plot(data,gpars= list(col=rainbow(20)))#plot series
+legend("topleft", legend = colnames(datapca), col=rainbow(20), lty = 1,cex = 0.5 )
+
+data_s<-datapca
+data_s<- scale(datapca)#standardize data
+ts.plot(data_s,gpars= list(col=rainbow(20)))
+legend("topleft", legend = colnames(data_s), col=rainbow(20), lty = 1,cex = 0.5)
+
+```
+
+```{r}
+
+cov.m<-cov(datapca)# compute coovariance matrix
+cov.m
+round(cov.m,digit=2) #see only two digits after the comma 
+max(diag(cov.m))
+min(diag(cov.m))
+cor.m<-cor(datapca)#compute the correlation matrix
+round(cor.m,digit=2)
+?princomp
+pca<-princomp(datapca,cor=TRUE) #principal components analysis on the correlation matrix
+pca
+
+allpca <-princomp(datapca,cor=FALSE) 
+allpca
+```
+# Table in Latex (correlation matrix)
+```{r}
+library(xtable)
+
+# Your correlation matrix 'cor_matrix'
+cor_matrix <- matrix(c(1, 0.1, -0.01, 0.35, -0.1, 0.24,
+                       0.1, 1, 0.73, 0.12, 0.66, 0.41,
+                       -0.01, 0.73, 1, -0.04, 0.92, 0.21,
+                       0.35, 0.12, -0.04, 1, -0.13, 0.39,
+                       -0.1, 0.66, 0.92, -0.13, 1, 0.07,
+                       0.24, 0.41, 0.21, 0.39, 0.07, 1), byrow = TRUE, ncol = 6)
+
+rownames(cor_matrix) <- colnames(cor_matrix) <- c("Fresh", "Milk", "Grocery", "Frozen", "Detergents_Paper", "Delicassen")
+
+cor_matrix[upper.tri(cor_matrix)] <- ""
+cor_df <- as.data.frame(cor_matrix)
+latex_table <- print(xtable(cor_df), include.rownames = TRUE, include.colnames = TRUE, comment = FALSE)
+
+```
+# We calculate eigen value and the proportion of variance (based on correlation matrix)
+
+```{r}
+screeplot(pca, npcs =17,type = c("lines"),ylim=c(0,5))
+summary(pca)
+pr.var <- pca$sdev^2#eigen values
+pr.variance <- pca$sdev^2
+
+pve <- pr.var / sum(pr.var)
+pr.var
+cumsum = cumsum (pve)* 100
+frame  = data.frame(pr.var, pve, cumsum)
+frame
+plot(cumsum(pve[1:17]), xlab = "Principal Component",ylab = "Proportion of Variance Explained",xlim=c(0,6),ylim = c(0, 1), type = "b")
+```
+
+# We calculate eigen value and the proportion of variance (based on covariance matrix)
+```{r}
+screeplot(allpca, npcs =17,type = c("lines"),ylim=c(0,5))
+summary(allpca)
+pr.var <- allpca$sdev^2#eigen values
+pr.variance <- pca$sdev^2
+
+pve <- pr.var / sum(pr.var)
+pr.var
+cumsum = cumsum (pve)* 100
+frame  = data.frame(pr.var, pve, cumsum)
+frame
+plot(cumsum(pve[1:17]), xlab = "Principal Component",ylab = "Proportion of Variance Explained",xlim=c(0,6),ylim = c(0, 1), type = "b")
+```
+# Loadings
+
+```{r}
+pca2<-prcomp(datapca)
+pca2
+load <- data.frame(Category = rownames(pca2$rotation), pca2$rotation[, 1:3])
+load
+colnames(load) = c("Category", "PC1","PC2", "PC3")
+load
+
+```
+PC1 Interpretation 
+
+The 'Fresh' category has a large negative loading on PC1 (-0.9765), which means that PC1 largely represents the spending on fresh products. Clients further to the left on the PC1 axis on your scatter plot tend to spend more on fresh products, while those further to the right tend to spend less.
+Other categories like 'Milk', 'Grocery', and 'Detergents_Paper' have smaller negative or positive loadings on PC1, indicating that they have a less significant but still meaningful contribution to the variation captured by PC1.
+
+PC2 Interpretation
+
+The 'Grocery' category has a high positive loading on PC2 (0.7646), suggesting that PC2 captures variance associated with grocery spending. Clients higher on the PC2 axis spend more on grocery products.
+'Milk' and 'Detergents_Paper' also contribute positively to PC2, albeit to a lesser extent. This suggests that clients with high values on PC2 also tend to spend more on milk and detergents/paper products.
+The 'Fresh' category has a small negative loading on PC2, indicating that it does not influence PC2 as much as PC1.
+
+# Plot to interpret components PC1 and PC2
+```{r}
+getwd()
+
+ggplot(data = load, aes(x = PC1, y = PC2, label = Category)) +
+  geom_point() +  # This adds the points to the plot
+  geom_text(aes(label=Category), hjust=0.5, vjust=-0.5, color = "blue") +  # This adds the text labels in blue
+  scale_x_continuous(limits = c(-1, 1), breaks = seq(-1, 1, 0.5)) +  # Set x-axis limits and breaks
+  scale_y_continuous(limits = c(-1, 1), breaks = seq(-1, 1, 0.5)) +  # Set y-axis limits and breaks
+  geom_vline(xintercept = 0, linetype="dashed", color = "black") +  # Add a vertical line at x=0
+  geom_hline(yintercept = 0, linetype="dashed", color = "black") +  # Add a horizontal line at y=0
+  labs(title = "PCA Loadings Plot", x = "Principal Component 1 (PC1)", y = "Principal Component 2 (PC2)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),  # Rotate x-axis text if needed
+        plot.title = element_text(hjust = 0.5))  # Center the title
+# Save the plot
+ggsave("pca_loadings_plot.pdf", width = 7, height = 5, device = "pdf")
+```
+
+```{r}
+datatr=t(datapca)
+pca1<-prcomp(datatr) #pca analysis
+pca1$rotation[,1:2]#loadings of the first two components
+pc = data.frame(pca1$rotation[,1:3])
+pc$Region = datapr$Region
+pc$Channel = datapr$Channel
+```
+# Plot differences beetwenn regions 
+
+Here are no visible clusters, probably will not use them.
+```{r}
+ggplot(pc, aes(x = PC1, y = PC2, color = as.factor(Region))) +
+  geom_point() +
+  theme_minimal() +
+  labs(color = "Region")
+
+ggplot(pc, aes(x = PC1, y = PC3, color = as.factor(Region))) +
+  geom_point() +
+  theme_minimal() +
+  labs(color = "Region")
+ggplot(pc, aes(x = PC2, y = PC3, color = as.factor(Region))) +
+  geom_point() +
+  theme_minimal() +
+  labs(color = "Region")
+```
+
+# Plot differences between channels
+
+```{r}
+pc$Channel <- factor(pc$Channel, levels = c(1, 2), labels = c("Horeca", "Retail"))
+
+
+p1= ggplot(pc, aes(x = PC1, y = PC2, color = as.factor(Channel))) +
+  geom_point() +
+  scale_color_manual(values = c("Horeca" ="#E41A1C", "Retail" ="#377EB8")) + # Change point colors
+  theme_minimal() +
+  labs(color = "Channel")
+ggsave("PC1_vs_PC2.pdf", p1, width = 7, height = 7, device = "pdf")
+
+
+p2=ggplot(pc, aes(x = PC1, y = PC3, color = as.factor(Channel))) +
+  geom_point() +
+   scale_color_manual(values = c("Horeca"="#4DAF4A",  "Retail" ="#984EA3")) + # Change point colors
+  theme_minimal() +
+  labs(color = "Channel")
+ggsave("PC1_vs_PC3.pdf", p2, width = 7, height = 7, device = "pdf")
+
+
+p3=ggplot(pc, aes(x = PC2, y = PC3, color = as.factor(Channel))) +
+  geom_point() +
+   scale_color_manual(values = c("Horeca"="#FF7F00","Retail"= "#FFFF33")) + # Change point colors
+  theme_minimal() +
+  labs(color = "Channel")
+
+
+ggsave("PC2_vs_PC3.pdf", p3, width = 7, height = 7, device = "pdf")
+
+p1
+p2
+p3
+```
+
+Realtionship between PC1 and PC2 (graph1)
+
+Horeca clients (Channel 1) are clustered to the left, they might be characterized by higher spending on fresh products, while Retail clients (Channel 2) might be represented by higher spending on groceries and other non-fresh products.
+
+
+# Plot from lab
+```{r}
+plot(pca1$rotation[,1],xlab="Costumers")
+abline(h=0)
+plot(pca1$rotation[,2],xlab="Costumers")
+abline(h=0)
+```
+
+
+```{r}
+datapr$Region=as.factor(datapr$Region)
+
+#churn rate in the dataset
+prop.table((table(datapr$Region)))
+
+```
+
+```{r}
+#boxplot
+?boxplot
+boxplot(datapr$Fresh~datapr$Region)
+boxplot(datapr$Milk~datapr$Region)
+boxplot(datapr$Grocery~datapr$Region)
+boxplot(datapr$Frozen~datapr$Region)
+boxplot(datapr$Detergents_Paper~datapr$Region)
+boxplot(datapr$Delicassen~datapr$Region)
+
+```
+```{r}
+data_s<-datapr
+#standardize data
+data_s[,1:(ncol(data_s)-1)]<-scale(datapr[,1:(ncol(datapr)-1)])
+library(caTools)
+set.seed(123)
+split = sample.split(data_s$Region, SplitRatio = 0.7)
+train= subset(data_s, split == TRUE)
+test= subset(data_s, split == FALSE)
+table(train$Region)
+table(test$Region)
+```
+```{r}
+library(MASS)
+model_LDA<-lda(Region~.,data=train)
+
+```
+
+```{r}
+library(biotools)
+pred_train<-predict(model_LDA,data=train)$class
+ct_train<-confusionmatrix(train$Region, pred_train)
+sum(diag(prop.table(ct_train)))
+#classification accuracy 86%
+```
+
+```{r}
+6.
+pred_test<-predict(model_LDA, test)$class
+ct_test<-confusionmatrix(test$Region, pred_test)
+sum(diag(prop.table(ct_test)))
+#classification accuracy 86%
+```
+
+```{r}
+model_QDA<-qda(Region~.,data=train)
+pred_train_QDA<-predict(model_QDA,data=train)$class
+ct_train_QDA<-confusionmatrix(train$region, pred_train_QDA)
+sum(diag(prop.table(ct_train_QDA)))
+```
+
+
+
+```{r}
+
+pred_test_QDA<-predict(model_QDA, test)$class
+ct_test_QDA<-confusionmatrix(test$Region, pred_test_QDA)
+sum(diag(prop.table(ct_test_QDA)))
+#classification accuracy 89%
+```
+
+
+7.
+
+
+
+
+
